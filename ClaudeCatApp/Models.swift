@@ -16,6 +16,12 @@ struct OAuthRefreshResponse: Decodable {
     let expires_in: Double?
 }
 
+struct OAuthRefreshFailure {
+    let message: String
+    let statusCode: Int
+    let retryAfter: TimeInterval?
+}
+
 struct CodexTokens: Decodable {
     let access_token: String?
     let account_id: String?

@@ -1,8 +1,8 @@
 import Foundation
 import Security
 
-func loadClaudeCredsRaw(allowExpiredCache: Bool = false) -> (data: Data, source: CredSource)? {
-    if let data = loadClaudeCredsFromCache(allowExpired: allowExpiredCache) {
+func loadClaudeCredsRaw(allowExpiredCache: Bool = false, skipCache: Bool = false) -> (data: Data, source: CredSource)? {
+    if !skipCache, let data = loadClaudeCredsFromCache(allowExpired: allowExpiredCache) {
         return (data, .cache(defaultClaudeCredsCacheURL()))
     }
 
@@ -37,8 +37,8 @@ func saveClaudeCredsRaw(_ data: Data, to source: CredSource) {
     }
 }
 
-func readClaudeCredentials() -> (creds: OAuthCreds?, error: String?) {
-    guard let (data, _) = loadClaudeCredsRaw(allowExpiredCache: true),
+func readClaudeCredentials(skipCache: Bool = false) -> (creds: OAuthCreds?, error: String?) {
+    guard let (data, _) = loadClaudeCredsRaw(allowExpiredCache: true, skipCache: skipCache),
           let parsed = try? JSONDecoder().decode(CredsFile.self, from: data),
           let oauth = parsed.claudeAiOauth else {
         return (nil, "ไม่พบ creds — เปิด Claude Code / login ก่อน")
@@ -46,12 +46,12 @@ func readClaudeCredentials() -> (creds: OAuthCreds?, error: String?) {
     return (oauth, nil)
 }
 
-func refreshClaudeToken(completion: @escaping (OAuthCreds?, String?) -> Void) {
+func refreshClaudeToken(completion: @escaping (OAuthCreds?, OAuthRefreshFailure?) -> Void) {
     guard let (data, source) = loadClaudeCredsRaw(allowExpiredCache: true),
           var root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
           var oauth = root["claudeAiOauth"] as? [String: Any],
           let refreshToken = oauth["refreshToken"] as? String, !refreshToken.isEmpty else {
-        completion(nil, "ไม่มี refresh token ใน creds")
+        completion(nil, OAuthRefreshFailure(message: "ไม่มี refresh token ใน creds", statusCode: 0, retryAfter: nil))
         return
     }
 
@@ -67,12 +67,15 @@ func refreshClaudeToken(completion: @escaping (OAuthCreds?, String?) -> Void) {
     req.httpBody = try? JSONSerialization.data(withJSONObject: body)
 
     URLSession.shared.dataTask(with: req) { data, resp, error in
-        let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        let http = resp as? HTTPURLResponse
+        let code = http?.statusCode ?? 0
+        let retryAfter = http?.value(forHTTPHeaderField: "Retry-After").flatMap(Double.init)
         guard error == nil, code == 200, let data = data,
               let r = try? JSONDecoder().decode(OAuthRefreshResponse.self, from: data) else {
             let b = data.flatMap { String(data: $0, encoding: .utf8) } ?? ""
-            log("claude refresh: HTTP \(code) — \(String(b.prefix(200)))")
-            completion(nil, "refresh ล้มเหลว (HTTP \(code))")
+            let message = "refresh ล้มเหลว (HTTP \(code))"
+            log("claude refresh: HTTP \(code) retry-after=\(retryAfter.map { String(Int($0)) } ?? "-") — \(String(b.prefix(200)))")
+            completion(nil, OAuthRefreshFailure(message: message, statusCode: code, retryAfter: retryAfter))
             return
         }
 

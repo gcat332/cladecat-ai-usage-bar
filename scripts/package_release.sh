@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 APP="ClaudeCat.app"
 DIST="dist"
 ZIP="$DIST/ClaudeCat-$VERSION.zip"

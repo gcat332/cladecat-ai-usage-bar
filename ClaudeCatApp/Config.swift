@@ -19,3 +19,4 @@ let backoffMax: TimeInterval = 900
 let appSupportDir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
     .appendingPathComponent("ClaudeCat")
 let customIconURL = appSupportDir.appendingPathComponent("icon.png")
+let claudeRefreshCooldownUntilKey = "claudeRefreshCooldownUntil"

@@ -10,7 +10,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem!
     var claudeTimer: Timer?
     var codexTimer: Timer?
-    var claudeState = ProviderRefreshState(baseInterval: pollInterval, maxInterval: backoffMax)
+    var claudeState = ProviderRefreshState(
+        baseInterval: pollInterval,
+        maxInterval: backoffMax,
+        cooldownUntil: UserDefaults.standard.object(forKey: claudeRefreshCooldownUntilKey) as? Date
+    )
     var codexState = ProviderRefreshState(baseInterval: pollInterval, maxInterval: backoffMax)
     var lastPct: Double?   // Claude 5h % → ใช้โชว์ข้างไอคอน
 
@@ -146,6 +150,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func saveClaudeCooldown() {
+        if let until = claudeState.cooldownUntil {
+            UserDefaults.standard.set(until, forKey: claudeRefreshCooldownUntilKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: claudeRefreshCooldownUntilKey)
+        }
+    }
+
     // ── icon ──
     func applyIcon() {
         // 1) custom icon (ผู้ใช้เลือกเอง) มาก่อน → static ไม่ animate
@@ -233,7 +245,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ── Claude ──
     func refreshClaude() {
         guard claudeState.beginRefresh() else {
-            log("claude refresh: skipped because previous refresh is still running")
+            if let until = claudeState.cooldownUntil {
+                let remaining = max(0, Int(until.timeIntervalSinceNow))
+                itemClaude5h.title = "5 hours: ⏳ refresh rate limited"
+                log("claude refresh: skipped during cooldown, \(remaining)s remaining")
+            } else {
+                log("claude refresh: skipped because previous refresh is still running")
+            }
             return
         }
         let (creds, err) = readClaudeCredentials()
@@ -254,9 +272,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     if let nc = newCreds {
                         self.fetchClaudeUsage(nc)
                     } else {
-                        self.itemClaude5h.title = "5 hours: 🔒 token หมดอายุ"
+                        if self.fetchFreshClaudeCredentialsAfterRateLimit(rerr) {
+                            return
+                        }
+                        if !self.applyClaudeRefreshFailure(rerr) {
+                            self.itemClaude5h.title = "5 hours: 🔒 token หมดอายุ"
+                            if let rerr = rerr { log("claude: \(rerr.message)") }
+                        }
                         self.itemClaudeWk.title = "weekly: —"
-                        if let rerr = rerr { log("claude: \(rerr)") }
                         self.claudeState.finishRefresh()
                     }
                 }
@@ -264,6 +287,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         fetchClaudeUsage(creds)
+    }
+
+    func fetchFreshClaudeCredentialsAfterRateLimit(_ failure: OAuthRefreshFailure?) -> Bool {
+        guard failure?.statusCode == 429 else { return false }
+        let (freshCreds, freshErr) = readClaudeCredentials(skipCache: true)
+        guard let freshCreds, !claudeTokenExpired(freshCreds) else {
+            if let freshErr = freshErr { log("claude refresh: fresh credential fallback unavailable — \(freshErr)") }
+            return false
+        }
+        log("claude refresh: using fresh credentials from Keychain/file after refresh 429")
+        fetchClaudeUsage(freshCreds)
+        return true
+    }
+
+    func applyClaudeRefreshFailure(_ failure: OAuthRefreshFailure?) -> Bool {
+        guard let failure,
+              let next = claudeState.applyTokenRefreshFailure(statusCode: failure.statusCode, retryAfter: failure.retryAfter) else {
+            return false
+        }
+        saveClaudeCooldown()
+        startClaudeTimer(next)
+        itemClaude5h.title = "5 hours: ⏳ refresh rate limited"
+        log("claude: \(failure.message), next refresh in \(Int(next))s")
+        return true
     }
 
     func fetchClaudeUsage(_ creds: OAuthCreds) {
@@ -295,15 +342,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 claudeState.markTokenRefreshAttempted()
                 log("claude api: HTTP \(code) → ลอง refresh token — body[:300]=\(String(body.prefix(300)))")
                 itemClaude5h.title = "5 hours: 🔄 ต่ออายุ token…"
-                refreshClaudeToken { [weak self] nc, _ in
+                refreshClaudeToken { [weak self] nc, failure in
                     DispatchQueue.main.async {
                         guard let self = self else { return }
                         if let nc = nc {
                             self.fetchClaudeUsage(nc)
                         } else {
-                            self.itemClaude5h.title = body.contains("scope")
-                                ? "5 hours: 🔒 token scope ไม่พอ (ใช้ Keychain)"
-                                : "5 hours: 🔒 token หมดอายุ"
+                            if self.fetchFreshClaudeCredentialsAfterRateLimit(failure) {
+                                return
+                            }
+                            if !self.applyClaudeRefreshFailure(failure) {
+                                self.itemClaude5h.title = body.contains("scope")
+                                    ? "5 hours: 🔒 token scope ไม่พอ (ใช้ Keychain)"
+                                    : "5 hours: 🔒 token หมดอายุ"
+                            }
                             self.itemClaudeWk.title = "weekly: —"
                             self.claudeState.finishRefresh()
                         }
@@ -338,8 +390,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        if claudeState.interval != pollInterval {
+        if claudeState.interval != pollInterval || claudeState.cooldownUntil != nil {
             claudeState.resetInterval()
+            saveClaudeCooldown()
             startClaudeTimer(claudeState.interval)
         }
         itemClaude5h.title = fmtClaude(usage.five_hour, "5 hours")

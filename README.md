@@ -41,7 +41,7 @@ The build script creates `ClaudeCat.app` from `ClaudeCatApp/*.swift`, copies bun
 ./scripts/package_release.sh
 ```
 
-The package script builds the app and writes `dist/ClaudeCat-1.0.0.zip`.
+The package script builds the app and writes `dist/ClaudeCat-1.0.1.zip`.
 
 ## Structure
 
