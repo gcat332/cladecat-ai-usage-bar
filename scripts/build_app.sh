@@ -37,4 +37,6 @@ fi
 echo ""
 echo "🚀 เปิดเลย: open \"$PWD/$APP\""
 read -p "เปิดตอนนี้? [Y/n] " yn
-[[ ! "$yn" =~ ^[Nn]$ ]] && open "$APP"
+if [[ ! "$yn" =~ ^[Nn]$ ]]; then
+    open "$APP"
+fi
