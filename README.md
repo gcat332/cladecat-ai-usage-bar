@@ -4,7 +4,7 @@ Native macOS menu bar app for watching Claude and Codex usage in one place.
 
 ClaudeCat reads local OAuth credentials from Claude Code and Codex/ChatGPT, then calls the same usage endpoints those tools rely on. It is a personal utility, not an official Anthropic or OpenAI product.
 
-![ClaudeCat menu bar preview](assets/readme-preview.png)
+![ClaudeCat menu bar preview](assets/preview.png)
 
 ## Features
 
