@@ -1,101 +1,54 @@
-# 🐱 ClaudeCat — Claude Usage Menu Bar Widget
+# ClaudeCat - Usage Menu Bar Widget
 
-Widget บน **macOS menu bar** ที่โชว์ usage ของ **Claude Pro/Max** (และ **Codex/ChatGPT**) แบบเรียลไทม์ — ดึงข้อมูลจาก endpoint เดียวกับคำสั่ง `/usage` ใน Claude Code จึงแม่นยำระดับ server-side
+Native macOS menu bar app for watching Claude and Codex usage in one place.
 
-โปรเจกต์นี้มี **2 เวอร์ชัน** ให้เลือกใช้:
+ClaudeCat reads local OAuth credentials from Claude Code and Codex/ChatGPT, then calls the same usage endpoints those tools rely on. It is a personal utility, not an official Anthropic or OpenAI product.
 
-| เวอร์ชัน | ไฟล์หลัก | จุดเด่น |
-|---------|----------|--------|
-| **Python** | `claude_usage_widget.py` | ติดตั้งง่าย รันได้เลย (ใช้ `rumps`) — โชว์เฉพาะ Claude |
-| **Swift (native `.app`)** | `ClaudeCatApp/main.swift` | แอปเนทีฟ ไอคอนอนิเมชัน เปลี่ยนไอคอนเองได้ รองรับทั้ง **Claude + Codex** |
+## Features
 
----
+- Shows 5-hour usage percentage in the macOS menu bar.
+- Dropdown includes Claude and Codex 5-hour and weekly windows.
+- Reads credentials from local Keychain/config files; no pasted token required.
+- Refreshes automatically and includes a manual Refresh action.
+- Backs off on rate limits.
+- Refreshes access tokens when refresh tokens are available.
+- Supports animated bundled icons and a user-selected custom icon.
 
-## ✨ Features
+## Requirements
 
-- แสดง **% การใช้งาน** ของ 5-hour window บน menu bar
-- Dropdown แสดงรายละเอียด: 5-hour, Weekly, Weekly Opus / Sonnet (Python) หรือ Claude + Codex (Swift)
-- อ่าน OAuth token จาก **macOS Keychain** ของ Claude Code อัตโนมัติ (ไม่ต้อง paste token เอง)
-- Refresh อัตโนมัติทุก 180 วินาที + ปุ่ม **Refresh Now**
-- Cache token ลงไฟล์ เพื่อไม่ให้ macOS เด้งถามรหัส Keychain ทุกครั้ง
-- Backoff อัตโนมัติเมื่อโดน rate limit (429)
-- เวอร์ชัน Swift: ต่ออายุ access token เองผ่าน OAuth refresh โดยไม่ต้องเปิด Claude Code
+- macOS 12.0 or newer.
+- Xcode Command Line Tools: `xcode-select --install`.
+- Claude Code must have been logged in on this machine at least once.
+- Codex/ChatGPT usage requires local Codex credentials.
 
----
+The Claude usage endpoint requires the `user:profile` OAuth scope from a normal Claude Code login. A token from `setup-token` is not enough.
 
-## 📋 ข้อกำหนดเบื้องต้น (Requirements)
-
-- macOS 12.0 ขึ้นไป
-- Python 3 (สำหรับเวอร์ชัน Python)
-- **เคย login Claude Code (`claude`) ในเครื่องนี้อย่างน้อย 1 ครั้ง** — เพราะ widget อ่าน OAuth credentials จาก Keychain item `"Claude Code-credentials"`
-- เวอร์ชัน Swift ต้องมี Xcode Command Line Tools (`xcode-select --install`)
-
-> **หมายเหตุ:** endpoint `/api/oauth/usage` ต้องการ scope `user:profile` ซึ่งมีเฉพาะใน login ปกติของ Claude Code — token ที่สร้างจาก `setup-token` ใช้ไม่ได้
-
----
-
-## 🚀 วิธีใช้งาน
-
-### เวอร์ชัน Python (แนะนำสำหรับเริ่มต้น)
+## Build
 
 ```bash
-# ติดตั้ง dependency แล้วรันเลย
-./scripts/setup.sh
-```
-
-หรือดับเบิลคลิก `scripts/start_widget.command` เพื่อเปิด
-
-ให้เปิดอัตโนมัติทุกครั้งที่ login:
-
-```bash
-./scripts/install_autostart.sh    # ติดตั้งเป็น LaunchAgent
-```
-
-### เวอร์ชัน Swift (native app)
-
-```bash
-./scripts/build_app.sh            # build ได้ ClaudeCat.app + (option) เพิ่มเข้า Login Items
+./scripts/build_app.sh
 open ClaudeCat.app
 ```
 
----
+The build script creates `ClaudeCat.app` from `ClaudeCatApp/main.swift`, copies bundled assets, ad-hoc signs the app, and can optionally add it to Login Items.
 
-## 🩺 แก้ปัญหา (Troubleshooting)
+## Structure
 
-ถ้า widget ไม่โชว์ข้อมูล ให้รัน doctor เพื่อดูว่าพังขั้นตอนไหน:
-
-```bash
-python3 claude_doctor.py            # เช็คทีละ step: Keychain → token → API
-python3 claude_doctor_profiles.py   # เช็ค usage แยกตาม profile (claude-g / claude-m)
-```
-
----
-
-## 📁 โครงสร้างไฟล์
-
-```
-claude_usage_widget.py       # widget หลัก (Python / rumps)
-claude_doctor.py             # เครื่องมือ diagnose
-claude_doctor_profiles.py    # diagnose แยกตาม profile
+```text
 ClaudeCatApp/
-  ├─ main.swift              # ซอร์สแอปเนทีฟ (Claude + Codex)
-  └─ Info.plist              # bundle config
+  main.swift      # native app source
+  Info.plist      # app bundle config
+assets/           # bundled icons and logos used by the app
 scripts/
-  ├─ build_app.sh            # build ClaudeCat.app
-  ├─ setup.sh                # ติดตั้ง + รันเวอร์ชัน Python
-  ├─ start_widget.command    # ดับเบิลคลิกเปิด
-  └─ install_autostart.sh    # ตั้งให้เปิดอัตโนมัติตอน login
-assets/                      # ไอคอน / รูปที่ใช้ตอน build และ runtime
+  build_app.sh    # build ClaudeCat.app
 ```
 
----
+Unused image variants are kept locally under `assets/unused/` and ignored by git.
 
-## 🔒 ความเป็นส่วนตัว
+## Privacy
 
-Widget อ่าน OAuth token จาก Keychain ในเครื่องคุณเท่านั้น และเรียก API ไปที่ Anthropic (และ OpenAI สำหรับ Codex) โดยตรง — ไม่มีการส่งข้อมูลไป server อื่น token ถูก cache ไว้ที่ `~/.claude/.claudecat_cache.json` ในเครื่องคุณเอง
+ClaudeCat reads OAuth credentials from local machine storage and calls Anthropic/OpenAI usage endpoints directly. It does not send data to any other server. Runtime logs/cache stay on your machine.
 
----
+## Disclaimer
 
-## ⚠️ Disclaimer
-
-โปรเจกต์นี้เป็นเครื่องมือส่วนตัว ไม่ได้เป็นผลิตภัณฑ์ทางการของ Anthropic หรือ OpenAI และใช้ endpoint ที่ไม่เป็นทางการ (unofficial) ซึ่งอาจเปลี่ยนแปลงได้ทุกเมื่อ
+This is a personal utility that uses unofficial endpoints which may change without notice.

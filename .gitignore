@@ -3,13 +3,6 @@
 .AppleDouble
 .LSOverride
 
-# ── Python ────────────────────────────────────────
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-
 # ── Build output / artifacts ──────────────────────
 # แอปที่ build แล้วจาก build_app.sh
 ClaudeCat.app/
@@ -22,6 +15,5 @@ assets/unused/
 
 # ── Logs / cache (runtime) ────────────────────────
 *.log
-.claude_widget.log
 .claude_cat.log
 .claudecat_cache.json
