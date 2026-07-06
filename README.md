@@ -4,6 +4,8 @@ Native macOS menu bar app for watching Claude and Codex usage in one place.
 
 ClaudeCat reads local OAuth credentials from Claude Code and Codex/ChatGPT, then calls the same usage endpoints those tools rely on. It is a personal utility, not an official Anthropic or OpenAI product.
 
+![ClaudeCat menu bar preview](assets/readme-preview.png)
+
 ## Features
 
 - Shows 5-hour usage percentage in the macOS menu bar.
@@ -11,7 +13,7 @@ ClaudeCat reads local OAuth credentials from Claude Code and Codex/ChatGPT, then
 - Reads credentials from local Keychain/config files; no pasted token required.
 - Caches Claude credentials locally to avoid repeated Keychain prompts.
 - Refreshes automatically and includes a manual Refresh action.
-- Backs off on rate limits.
+- Prevents overlapping refreshes and backs off per provider on rate limits.
 - Refreshes access tokens when refresh tokens are available.
 - Supports animated bundled icons and a user-selected custom icon.
 
@@ -31,17 +33,27 @@ The Claude usage endpoint requires the `user:profile` OAuth scope from a normal 
 open ClaudeCat.app
 ```
 
-The build script creates `ClaudeCat.app` from `ClaudeCatApp/main.swift`, copies bundled assets, ad-hoc signs the app, and can optionally add it to Login Items.
+The build script creates `ClaudeCat.app` from `ClaudeCatApp/*.swift`, copies bundled assets, ad-hoc signs the app, and can optionally add it to Login Items.
+
+## Release Package
+
+```bash
+./scripts/package_release.sh
+```
+
+The package script builds the app and writes `dist/ClaudeCat-1.0.0.zip`.
 
 ## Structure
 
 ```text
 ClaudeCatApp/
-  main.swift      # native app source
-  Info.plist      # app bundle config
-assets/           # bundled icons and logos used by the app
+  *.swift             # native app source split by responsibility
+  Info.plist          # app bundle config
+assets/               # bundled icons, logos, and README preview
 scripts/
-  build_app.sh    # build ClaudeCat.app
+  build_app.sh        # interactive local build
+  package_release.sh  # non-interactive release zip
+tests/                # small Swift logic tests
 ```
 
 Unused image variants are kept locally under `assets/unused/` and ignored by git.

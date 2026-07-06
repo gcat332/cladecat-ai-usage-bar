@@ -6,6 +6,7 @@
 # ── Build output / artifacts ──────────────────────
 # แอปที่ build แล้วจาก build_app.sh
 ClaudeCat.app/
+dist/
 # zip ของ .app ที่ build ไว้ (ไม่ใช่ซอร์ส)
 ClaudeCat.zip
 zioUBEC1
