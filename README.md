@@ -9,6 +9,7 @@ ClaudeCat reads local OAuth credentials from Claude Code and Codex/ChatGPT, then
 - Shows 5-hour usage percentage in the macOS menu bar.
 - Dropdown includes Claude and Codex 5-hour and weekly windows.
 - Reads credentials from local Keychain/config files; no pasted token required.
+- Caches Claude credentials locally to avoid repeated Keychain prompts.
 - Refreshes automatically and includes a manual Refresh action.
 - Backs off on rate limits.
 - Refreshes access tokens when refresh tokens are available.
@@ -47,7 +48,7 @@ Unused image variants are kept locally under `assets/unused/` and ignored by git
 
 ## Privacy
 
-ClaudeCat reads OAuth credentials from local machine storage and calls Anthropic/OpenAI usage endpoints directly. It does not send data to any other server. Runtime logs/cache stay on your machine.
+ClaudeCat reads OAuth credentials from local machine storage and calls Anthropic/OpenAI usage endpoints directly. It does not send data to any other server. Runtime logs/cache stay on your machine under `~/Library/Application Support/ClaudeCat/`.
 
 ## Disclaimer
 

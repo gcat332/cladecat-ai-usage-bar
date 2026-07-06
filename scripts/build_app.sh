@@ -23,7 +23,7 @@ cp ClaudeCatApp/Info.plist "$APP/Contents/Info.plist"
 [ -f assets/claude_logo.png ] && cp assets/claude_logo.png "$APP/Contents/Resources/"
 [ -f assets/codex_logo.png ] && cp assets/codex_logo.png "$APP/Contents/Resources/"
 
-swiftc -O ClaudeCatApp/main.swift -o "$APP/Contents/MacOS/ClaudeCat"
+swiftc -O ClaudeCatApp/main.swift ClaudeCatApp/CredentialCache.swift -o "$APP/Contents/MacOS/ClaudeCat"
 codesign --force -s - "$APP" 2>/dev/null || true
 echo "✅ Build สำเร็จ: $PWD/$APP"
 

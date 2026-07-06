@@ -64,24 +64,10 @@ struct ClaudeUsageResponse: Decodable {
     let seven_day: UsageWindow?
 }
 
-struct OAuthCreds: Decodable {
-    let accessToken: String
-    let expiresAt: Double?
-}
-
-struct CredsFile: Decodable {
-    let claudeAiOauth: OAuthCreds?
-}
-
 struct OAuthRefreshResponse: Decodable {
     let access_token: String
     let refresh_token: String?
     let expires_in: Double?     // seconds
-}
-
-enum CredSource {
-    case keychain
-    case file(URL)
 }
 
 // ── models: Codex ───────────────────────────────────────────────────────────────
@@ -121,9 +107,13 @@ struct CodexRefreshResponse: Decodable {
 // เมื่อรัน Claude Code → อ่าน Keychain เป็นหลัก, fallback ไฟล์ ~/.claude/.credentials.json
 // (กรณี SSH/Linux หรือ export มาเอง)
 
-/// อ่าน creds ดิบ + บอกว่ามาจาก Keychain หรือไฟล์ (ไว้เขียน token ใหม่กลับที่เดิม)
-func loadClaudeCredsRaw() -> (data: Data, source: CredSource)? {
-    // 1) macOS Keychain (source หลัก)
+/// อ่าน creds ดิบ + บอก source: cache → Keychain → file
+func loadClaudeCredsRaw(allowExpiredCache: Bool = false) -> (data: Data, source: CredSource)? {
+    if let data = loadClaudeCredsFromCache(allowExpired: allowExpiredCache) {
+        return (data, .cache(defaultClaudeCredsCacheURL()))
+    }
+
+    // macOS Keychain เป็น source หลัก แต่แตะเฉพาะเมื่อ cache ไม่มี/ใช้ไม่ได้
     let query: [String: Any] = [
         kSecClass as String: kSecClassGenericPassword,
         kSecAttrService as String: claudeKeychainService,
@@ -132,12 +122,15 @@ func loadClaudeCredsRaw() -> (data: Data, source: CredSource)? {
     ]
     var item: CFTypeRef?
     if SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess, let data = item as? Data {
+        saveClaudeCredsToCache(data)
         return (data, .keychain)
     }
-    // 2) fallback: ~/.claude/.credentials.json
+
+    // fallback: ~/.claude/.credentials.json
     let credsURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".claude/.credentials.json")
     if let data = try? Data(contentsOf: credsURL) {
+        saveClaudeCredsToCache(data)
         return (data, .file(credsURL))
     }
     return nil
@@ -146,22 +139,17 @@ func loadClaudeCredsRaw() -> (data: Data, source: CredSource)? {
 /// เขียน creds (ทั้งก้อน JSON) กลับไปที่ source เดิม
 func saveClaudeCredsRaw(_ data: Data, to source: CredSource) {
     switch source {
-    case .keychain:
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: claudeKeychainService,
-        ]
-        let attrs: [String: Any] = [kSecValueData as String: data]
-        let status = SecItemUpdate(query as CFDictionary, attrs as CFDictionary)
-        if status != errSecSuccess { log("claude refresh: keychain update failed (\(status))") }
+    case .keychain, .cache:
+        saveClaudeCredsToCache(data)
     case .file(let url):
         try? data.write(to: url)
+        saveClaudeCredsToCache(data)
     }
 }
 
 func readClaudeCredentials() -> (creds: OAuthCreds?, error: String?) {
-    // อ่านจาก Keychain (Claude Code login) → fallback ~/.claude/.credentials.json — refresh ได้
-    guard let (data, _) = loadClaudeCredsRaw(),
+    // อ่านจาก cache ก่อนเพื่อเลี่ยง Keychain prompt รอบ poll; cache ที่หมดอายุยังใช้เพื่อเข้า refresh path ได้
+    guard let (data, _) = loadClaudeCredsRaw(allowExpiredCache: true),
           let parsed = try? JSONDecoder().decode(CredsFile.self, from: data),
           let oauth = parsed.claudeAiOauth else {
         return (nil, "ไม่พบ creds — เปิด Claude Code / login ก่อน")
@@ -169,9 +157,9 @@ func readClaudeCredentials() -> (creds: OAuthCreds?, error: String?) {
     return (oauth, nil)
 }
 
-/// ต่ออายุ access token ด้วย refresh token → เขียนกลับ Keychain/ไฟล์ → คืน creds ใหม่
+/// ต่ออายุ access token ด้วย refresh token → เขียนกลับ cache/source → คืน creds ใหม่
 func refreshClaudeToken(completion: @escaping (OAuthCreds?, String?) -> Void) {
-    guard let (data, source) = loadClaudeCredsRaw(),
+    guard let (data, source) = loadClaudeCredsRaw(allowExpiredCache: true),
           var root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
           var oauth = root["claudeAiOauth"] as? [String: Any],
           let refreshToken = oauth["refreshToken"] as? String, !refreshToken.isEmpty else {
