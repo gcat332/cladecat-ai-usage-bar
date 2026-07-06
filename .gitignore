@@ -1,0 +1,27 @@
+# ── macOS ─────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# ── Python ────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ── Build output / artifacts ──────────────────────
+# แอปที่ build แล้วจาก build_app.sh
+ClaudeCat.app/
+# zip ของ .app ที่ build ไว้ (ไม่ใช่ซอร์ส)
+ClaudeCat.zip
+zioUBEC1
+
+# ── Unused image variants ─────────────────────────
+assets/unused/
+
+# ── Logs / cache (runtime) ────────────────────────
+*.log
+.claude_widget.log
+.claude_cat.log
+.claudecat_cache.json
